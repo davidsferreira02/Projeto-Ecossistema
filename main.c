@@ -2,24 +2,20 @@
 #include <stdlib.h>
 #include <mpi.h>
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        printf("Imprime o nome do ficheiro da matriz para ler\n");
-        return 1;
-    }
+#define INF 99999
 
+int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
 
     int n, rank, size;
-    int q = 0;
-    int p = 0;
-    int div = 0;
-    int submatriz_dim; // Variável para a dimensão da submatriz
+    int p,q,div;
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    if (rank == 0) {
-        FILE *file = fopen(argv[1], "r");
+
+  if(rank==0){
+     FILE *file = fopen(argv[1], "r");
 
         if (file == NULL) {
             printf("Erro ao abrir o arquivo.\n");
@@ -29,12 +25,11 @@ int main(int argc, char *argv[]) {
 
         fscanf(file, "%d", &n);
         fclose(file);
-
-        for (int i = 2; i < n; i++) {
+for (int i = 2; i < n; i++) {
             if (n % i == 0) {
                 q = i;
                 p = q * q;
-                div = n / i;
+                div = n / q;
                 break;
             }
         }
@@ -51,15 +46,35 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        submatriz_dim = n / q; // Calcula a dimensão da submatriz
+  }
+    // Define o número de vértices do grafo (tamanho da matriz)
+    
+ MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // Divide a matriz em submatrizes
+    int submatrix_size =div*div;
+    int submatrix[n][n];
+    int matrix[n][n];
+    
+    
+    
+    
+    // Inicialize a submatriz com valores infinitos (exceto para a diagonal principal)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            if (i == j) {
+                submatrix[i][j] = 0;
+            } else {
+                submatrix[i][j] = INF;
+            }
+        }
     }
 
-    MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&submatriz_dim, 1, MPI_INT, 0, MPI_COMM_WORLD); // Transmite a dimensão da submatriz
-    int matriz[n][n];
-
+    
+    
+    
+    // Leitura da matriz completa no processo 0 (apenas para fins de exemplo)
     if (rank == 0) {
-        FILE *file = fopen(argv[1], "r");
+          FILE *file = fopen(argv[1], "r");
 
         if (file == NULL) {
             printf("Erro ao abrir o arquivo.\n");
@@ -70,49 +85,88 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
-                fscanf(file, "%d", &matriz[i][j]);
+                fscanf(file, "%d", &matrix[i][j]);
             }
         }
 
         fclose(file);
-    }
-
-    MPI_Bcast(matriz, n * n, MPI_INT, 0, MPI_COMM_WORLD);
-
-    // Aloca espaço para a submatriz com base na dimensão calculada
-    int submatriz[submatriz_dim][submatriz_dim];
-
-      int submatrix_count = n / submatriz_dim;
-    int submatrix_size = submatriz_dim * submatriz_dim;
-
-    // Divide as submatrizes entre os processos
-    int row_start = (rank / 2) * submatriz_dim;
-    int col_start = (rank % 2) * submatriz_dim;
-
-    for (int i = 0; i < submatriz_dim; i++) {
-        for (int j = 0; j < submatriz_dim; j++) {
-            submatriz[i][j] = matriz[row_start + i][col_start + j];
-        }
-    }
-
-   
-  
-
-    MPI_Barrier(MPI_COMM_WORLD); // Aguarda que todos os processos tenham a submatriz.
-
-    // Imprime a submatriz em cada processo
-    for (int process_rank = 0; process_rank < size; process_rank++) {
-        if (rank == process_rank) {
-            printf("Submatriz do processo %d (DIMENSAO %d):\n", rank, submatriz_dim);
-            for (int i = 0; i < submatriz_dim; i++) {
-                for (int j = 0; j < submatriz_dim; j++) {
-                    printf("%d ", submatriz[i][j]);
+        
+       
+        for(int i=0;i<n;i++){
+            for(int j=0;j<n;j++){
+                if(i!=j && matrix[i][j]==0){
+                    matrix[i][j]=INF;
                 }
-                printf("\n");
             }
         }
-        MPI_Barrier(MPI_COMM_WORLD); // Aguarda antes de prosseguir para o próximo processo.
     }
+
+
+
+        MPI_Barrier(MPI_COMM_WORLD); // Aguarda antes de prosseguir para o próximo processo.
+        // Distribui as submatrizes para os outros processos
+        for (int dest = 1; dest < size; dest++) {
+            MPI_Send(&matrix[0][0], n * n, MPI_INT, dest, 0, MPI_COMM_WORLD);
+        }
+    MPI_Bcast(matrix, n * n, MPI_INT, 0, MPI_COMM_WORLD);
+
+    //outro codigo 
+
+
+
+
+
+
+    
+    if(rank!=0) {
+        // Recebe a submatriz do processo 0
+        MPI_Recv(&submatrix[0][0], n * n, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        printf("Processo %d\n",rank);
+        printf("submatriz[0][0] recebida do processo 0  %d\n",submatrix[0][0]);
+    }
+
+    // Algoritmo de Floyd-Warshall nas submatrizes
+    for (int k = 0; k < n; k++) {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (submatrix[i][k] + submatrix[k][j] < submatrix[i][j]) {
+                    submatrix[i][j] = submatrix[i][k] + submatrix[k][j];
+                }
+            }
+        }
+    }
+
+
+    // Envio das submatrizes atualizadas para o processo 0
+    if (rank != 0) {
+        MPI_Send(&submatrix[0][0], n * n, MPI_INT, 0, 0, MPI_COMM_WORLD);
+        printf("Processo %d\n",rank);
+        printf("submatriz[0][0] enviada  para o processo 0 %d\n",submatrix[0][0]);
+        
+    } else {
+        // Recebe submatrizes das outros processos e atualiza a matriz completa
+        for (int source = 1; source < size; source++) {
+            MPI_Recv(&submatrix[0][0], n * n, MPI_INT, source, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+
+        // Impressão da matriz completa
+        printf("Matriz de custo mínima:\n");
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                if (submatrix[i][j] == INF) {
+                    printf("0\t");  // Substitui "INF" por "0"
+                } else {
+                    printf("%d\t", submatrix[i][j]);
+                }
+            }
+            printf("\n");
+        }
+    }
+
+    
+
+
+
 
     MPI_Finalize();
 
