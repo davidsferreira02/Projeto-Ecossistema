@@ -40,17 +40,11 @@ for (int i = 2; i < n; i++) {
             return 1;
         }
 
-        if (size != p) {
-            printf("Numero errado de processos dado na linha de comandos\n");
-            MPI_Finalize();
-            return 1;
-        }
-
   }
-    // Define o número de vértices do grafo (tamanho da matriz)
+    
     
  MPI_Bcast(&n, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    // Divide a matriz em submatrizes
+    
     int submatrix_size =div*div;
     int submatrix[n][n];
     int matrix[n][n];
@@ -58,7 +52,6 @@ for (int i = 2; i < n; i++) {
     
     
     
-    // Inicialize a submatriz com valores infinitos (exceto para a diagonal principal)
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < n; j++) {
             if (i == j) {
@@ -68,11 +61,8 @@ for (int i = 2; i < n; i++) {
             }
         }
     }
-
     
     
-    
-    // Leitura da matriz completa no processo 0 (apenas para fins de exemplo)
     if (rank == 0) {
           FILE *file = fopen(argv[1], "r");
 
@@ -103,14 +93,14 @@ for (int i = 2; i < n; i++) {
 
 
 
-        MPI_Barrier(MPI_COMM_WORLD); // Aguarda antes de prosseguir para o próximo processo.
-        // Distribui as submatrizes para os outros processos
+        MPI_Barrier(MPI_COMM_WORLD); 
         for (int dest = 1; dest < size; dest++) {
-            MPI_Send(&matrix[0][0], n * n, MPI_INT, dest, 0, MPI_COMM_WORLD);
+            MPI_Send(&matrix, n * n, MPI_INT, dest, 0, MPI_COMM_WORLD);
+           
         }
     MPI_Bcast(matrix, n * n, MPI_INT, 0, MPI_COMM_WORLD);
 
-    //outro codigo 
+   
 
 
 
@@ -119,13 +109,13 @@ for (int i = 2; i < n; i++) {
 
     
     if(rank!=0) {
-        // Recebe a submatriz do processo 0
-        MPI_Recv(&submatrix[0][0], n * n, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        printf("Processo %d\n",rank);
-        printf("submatriz[0][0] recebida do processo 0  %d\n",submatrix[0][0]);
+       
+        MPI_Recv(&submatrix, n * n, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        
+        
     }
 
-    // Algoritmo de Floyd-Warshall nas submatrizes
+
     for (int k = 0; k < n; k++) {
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
@@ -137,24 +127,27 @@ for (int i = 2; i < n; i++) {
     }
 
 
-    // Envio das submatrizes atualizadas para o processo 0
+  
     if (rank != 0) {
-        MPI_Send(&submatrix[0][0], n * n, MPI_INT, 0, 0, MPI_COMM_WORLD);
-        printf("Processo %d\n",rank);
-        printf("submatriz[0][0] enviada  para o processo 0 %d\n",submatrix[0][0]);
+        MPI_Send(&submatrix, n * n, MPI_INT, 0, 0, MPI_COMM_WORLD);
+        
+       
         
     } else {
-        // Recebe submatrizes das outros processos e atualiza a matriz completa
+       
         for (int source = 1; source < size; source++) {
-            MPI_Recv(&submatrix[0][0], n * n, MPI_INT, source, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            MPI_Recv(&submatrix, n * n, MPI_INT, source, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+             
+
+
         }
 
-        // Impressão da matriz completa
+
         printf("Matriz de custo mínima:\n");
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 if (submatrix[i][j] == INF) {
-                    printf("0\t");  // Substitui "INF" por "0"
+                    printf("0\t"); 
                 } else {
                     printf("%d\t", submatrix[i][j]);
                 }
@@ -163,8 +156,7 @@ for (int i = 2; i < n; i++) {
         }
     }
 
-    
-
+   
 
 
 
